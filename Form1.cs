@@ -10,13 +10,22 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.VisualBasic;
 using System.IO;
+using System.Windows.Forms.DataVisualization.Charting;
+using System.Globalization;
+
 
 
 
 namespace SoftSensConf_Arbeidskrav
 {
     public partial class Form1 : Form
+        
     {
+        List<int> analogReading = new List<int>();
+        List<DateTime> timeStamp = new List<DateTime>();
+
+        List<float> scaledReading = new List<float>();
+        List<DateTime> timeStampScaled = new List<DateTime>();
         public Form1()
         {
             InitializeComponent();
@@ -29,13 +38,36 @@ namespace SoftSensConf_Arbeidskrav
             serialPort1.DataReceived += new SerialDataReceivedEventHandler(DataRecievedHandler);
             //StatusTimer.Interval = 2000;// Timer status, slik at timer events sjekkes jevnlig (hvert 2 Sec)
             //StatusTimer.Tick += new EventHandler(StatusTimer_Tick);
+
+
+            timerRaw.Interval = 5000;
+            timerRaw.Tick += new EventHandler(timerRaw_Tick);
+
+            timerScaled.Interval = 5000;
+            timerScaled.Tick += new EventHandler(timerScaled_Tick);
+
+        }
+
+        private void timerScaled_Tick(object sender, EventArgs e)
+        {
+            serialPort1.WriteLine("readscaled");
+        }
+
+        private void timerRaw_Tick(object sender, EventArgs e)
+        {
+            serialPort1.WriteLine("readraw");
         }
 
         void DataRecievedHandler(object sender, SerialDataReceivedEventArgs e)
         {
             string RecievedData = ((SerialPort)sender).ReadLine();
             string[] recievedData = RecievedData.Split(';');
+            string[] separateParts = RecievedData.Split(';');
 
+            int iVab;
+            float iVab_float;
+            //textBoxSend.Invoke((MethodInvoker)delegate //{ textBoxSend.AppendText(separateParts[1] + "\r\n"); });
+            //{
             if (recievedData[0] == "readconf")
             {
                 textBoxSerialResult.Invoke((MethodInvoker)delegate
@@ -45,9 +77,13 @@ namespace SoftSensConf_Arbeidskrav
                     labelLowerValue.Text = recievedData[2];
                     labelAlarmUpper.Text = recievedData[5];
                     labelAlarmLower.Text = recievedData[4];
-                });
 
+                });
             }
+        //});
+                
+
+            
             if (recievedData[0] == "writeconf")
             {
                 textBoxSerialResult.Invoke((MethodInvoker)delegate
@@ -62,8 +98,35 @@ namespace SoftSensConf_Arbeidskrav
                         serialPort1.WriteLine("readconf");
                     }
                 });
-
             }
+
+            if (separateParts[0] == "readraw")
+            { 
+                if (int.TryParse(separateParts[1], out iVab))
+                {
+                    analogReading.Add(iVab);
+                    timeStamp.Add(DateTime.Now);
+                    textBoxSend.Invoke((MethodInvoker)delegate { Chart.Series["Vba"].Points.DataBindXY(timeStamp, analogReading); });
+                    textBoxSend.Invoke((MethodInvoker)delegate { Chart.Invalidate(); });
+                }
+                else
+                {
+                    MessageBox.Show("Failed");
+                }
+            }
+
+            if (separateParts[0] == "readscaled")
+            {
+                if (float.TryParse(separateParts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out iVab_float))
+                    textBoxSend.Invoke((MethodInvoker)delegate
+                    {
+                        scaledReading.Add(iVab_float);
+                        timeStampScaled.Add(DateTime.Now);
+                        Chart.Series["Vba"].Points.DataBindXY(timeStampScaled, scaledReading);
+                        Chart.Invalidate();
+                    });
+            }
+
         }
         private void Connect_Button_Click(object sender, EventArgs e)
         {
@@ -171,21 +234,6 @@ namespace SoftSensConf_Arbeidskrav
             }
         } // Save To File knappen lagrer current parameters til fil
 
- 
-
-        private void buttonUpdate_Click(object sender, EventArgs e)
-        {
-            string a = getNewSerial();
-            float lv = getNewLowerValue();
-            float uv = getNewUpperValue();
-            int al = getNewAlarmLower();
-            int au = getNewAlarmUpper();
-            string sendAll = ValidateText(a, lv, uv, al, au);
-            //string passwordbox = Interaction.InputBox("Authentication is required to update instrument values. Please enter password:", "Authentication Required", "..", 10, 10);
-            //serialPort1.WriteLine("writevalue" + ">" + passwordbox + ">" + sendAll);
-            //KRYSSE AV FOR VISUAL BASIC (FRA ØVERST MICROSOFT) ETT STED: FIND IT
-        }
-
         private string getNewSerial()
         {
             return textBoxAdress.Text;
@@ -209,7 +257,8 @@ namespace SoftSensConf_Arbeidskrav
 
         private string ValidateText(string a, float lv, float uv, int al, int au)
 
-        { if (a.Length == 0 || a.Length < 10 || a.Length > 10)
+        {
+            if (a.Length == 0 || a.Length < 10 || a.Length > 10)
             {
                 MessageBox.Show("Serial Number Lenght is invalid! It must be 10 characters!");
                 return "";
@@ -249,10 +298,98 @@ namespace SoftSensConf_Arbeidskrav
                 MessageBox.Show("Alarm Upper and Alarm Lower cannot be the same!");
                 return "";
             }
-            else
+            else        //If all the checks above are passed return the string
             {
-                return ValidateText(a, lv, uv, al, au);
+
+
+                string newa = a.ToString();
+                string newuv = lv.ToString();
+                string newlv = uv.ToString();
+                string newal = al.ToString();
+                string newau = au.ToString();
+                string[] newargs = { newa, newlv, newuv, newal, newau };
+                string NewConf = string.Join(";", newargs);                     //String joined with ; that the instrument needs
+                return NewConf;                                   //New config returned 
+
+
             }
         }
+ 
+        private void buttonUpdate_Click(object sender, EventArgs e)
+        {
+            string a = getNewSerial();
+            float lv = getNewLowerValue();
+            float uv = getNewUpperValue();
+            int al = getNewAlarmLower();
+            int au = getNewAlarmUpper();
+            string sendAll = ValidateText(a, lv, uv, al, au);
+            string passwordbox = Interaction.InputBox("Authentication is required to update instrument values. Please enter password:", "Authentication Required", "..", 10, 10);
+            serialPort1.WriteLine("writeconf" + ">" + passwordbox + ">" + sendAll);
+            
+        }
+
+
+
+        
+
+        private void buttonManual_Click(object sender, EventArgs e) //ReadRaw
+        {
+            timerScaled.Stop();
+            if (serialPort1.IsOpen)
+            {
+                textBoxCommando.Text = "readraw";
+                textBoxCommando.ReadOnly = true;
+                timerRaw.Start();
+            }
+            else
+            {
+                MessageBox.Show("Port not open!");
+            }
+            label18.Text = "Raw Values";
+        }
+
+        private void buttonAuto_Click(object sender, EventArgs e) //Readscaled
+        {
+            timerRaw.Stop();
+            if (serialPort1.IsOpen)
+            {
+                textBoxCommando.Text = "readscaled";
+                textBoxCommando.ReadOnly = true;
+                timerScaled.Start();
+            }
+            else
+            {
+                MessageBox.Show("Port not open!");
+            }
+            label18.Text = "Scaled Values";
+        }
+
+        private void buttonStop_Click(object sender, EventArgs e) //Stop + save
+        {
+            if (serialPort1.IsOpen)
+            {
+                textBoxCommando.ReadOnly = false;
+                timerRaw.Stop();
+                timerScaled.Stop();
+
+                DialogResult dialogResult = MessageBox.Show("Do you want to save file?", "Save To File", MessageBoxButtons.YesNo);
+
+                if (dialogResult == DialogResult.Yes)
+                {
+                    StreamWriter Save = new StreamWriter(@"C:\Users\Mats_\Desktop\OOP\numerisk_data.CSV");
+                    Save.WriteLine("Dato : " + DateTime.Now.ToString()); Save.Write(textBoxSend.Text);
+                    MessageBox.Show("Saving completed!");
+                    Save.Close();
+                }
+
+
+                else
+                {
+                    MessageBox.Show("Port not open!");
+                }
+            }
+        }
+
+  
     }
 }
