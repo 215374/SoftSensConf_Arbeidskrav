@@ -36,8 +36,7 @@ namespace SoftSensConf_Arbeidskrav
             comboBoxBit.Items.AddRange(bitRate);
             comboBoxBit.SelectedIndex = comboBoxBit.Items.IndexOf("9600");
             serialPort1.DataReceived += new SerialDataReceivedEventHandler(DataRecievedHandler);
-            //StatusTimer.Interval = 2000;// Timer status, slik at timer events sjekkes jevnlig (hvert 2 Sec)
-            //StatusTimer.Tick += new EventHandler(StatusTimer_Tick);
+           
 
 
             timerRaw.Interval = 5000;
@@ -68,6 +67,37 @@ namespace SoftSensConf_Arbeidskrav
             float iVab_float;
             //textBoxSend.Invoke((MethodInvoker)delegate //{ textBoxSend.AppendText(separateParts[1] + "\r\n"); });
             //{
+
+            if (separateParts[0] == "readstatus")
+            {
+                labelAlarmStatus.Invoke((MethodInvoker)delegate
+                {
+
+
+                if (separateParts[1].Trim() == "0")
+                {
+                    labelAlarmStatus.Text = "ok";
+                }
+
+                if (separateParts[1].Trim() == "1")
+                {
+                    labelAlarmStatus.Text = "fail";
+                }
+
+                if (separateParts[1].Trim() == "2")
+                {
+                    labelAlarmStatus.Text = "alarm lower";
+                }
+
+                if (separateParts[1].Trim() == "3")
+                {
+                    labelAlarmStatus.Text = "alarm upper";
+                }
+                });
+            }
+
+
+
             if (recievedData[0] == "readconf")
             {
                 textBoxSerialResult.Invoke((MethodInvoker)delegate
@@ -108,6 +138,9 @@ namespace SoftSensConf_Arbeidskrav
                     timeStamp.Add(DateTime.Now);
                     textBoxSend.Invoke((MethodInvoker)delegate { Chart.Series["Vba"].Points.DataBindXY(timeStamp, analogReading); });
                     textBoxSend.Invoke((MethodInvoker)delegate { Chart.Invalidate(); });
+                    textBoxSend.Invoke((MethodInvoker)delegate { textBoxSend.AppendText(separateParts[1] + "\r\n"); });
+                    serialPort1.WriteLine("readstatus");
+
                 }
                 else
                 {
@@ -124,6 +157,9 @@ namespace SoftSensConf_Arbeidskrav
                         timeStampScaled.Add(DateTime.Now);
                         Chart.Series["Vba"].Points.DataBindXY(timeStampScaled, scaledReading);
                         Chart.Invalidate();
+                        textBoxSend.Invoke((MethodInvoker)delegate { textBoxSend.AppendText(separateParts[1] + "\r\n"); });
+                        serialPort1.WriteLine("readstatus");
+
                     });
             }
 
@@ -307,7 +343,7 @@ namespace SoftSensConf_Arbeidskrav
                 string newlv = uv.ToString();
                 string newal = al.ToString();
                 string newau = au.ToString();
-                string[] newargs = { newa, newlv, newuv, newal, newau };
+                string[] newargs = { newa, newuv, newlv, newal, newau };
                 string NewConf = string.Join(";", newargs);                     //String joined with ; that the instrument needs
                 return NewConf;                                   //New config returned 
 
@@ -376,11 +412,12 @@ namespace SoftSensConf_Arbeidskrav
 
                 if (dialogResult == DialogResult.Yes)
                 {
-                    StreamWriter Save = new StreamWriter(@"C:\Users\Mats_\Desktop\OOP\numerisk_data.CSV");
+                    StreamWriter Save = new StreamWriter(@"C:\Users\ander\OneDrive\Skrivebord\Test.csv");
                     Save.WriteLine("Dato : " + DateTime.Now.ToString()); Save.Write(textBoxSend.Text);
                     MessageBox.Show("Saving completed!");
                     Save.Close();
                 }
+
 
 
                 else
@@ -390,6 +427,10 @@ namespace SoftSensConf_Arbeidskrav
             }
         }
 
-  
+        private void D_Connect_Button_Click_1(object sender, EventArgs e)
+        {
+            serialPort1.Close();
+            MessageBox.Show(" Disconnected from " + comboBoxPort.Text);
+        }
     }
 }
