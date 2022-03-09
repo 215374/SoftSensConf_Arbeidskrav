@@ -65,8 +65,7 @@ namespace SoftSensConf_Arbeidskrav
 
             int iVab;
             float iVab_float;
-            //textBoxSend.Invoke((MethodInvoker)delegate //{ textBoxSend.AppendText(separateParts[1] + "\r\n"); });
-            //{
+            
 
             if (separateParts[0] == "readstatus")
             {
